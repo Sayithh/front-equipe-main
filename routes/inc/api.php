@@ -32,3 +32,7 @@ Route::get('/api/equipe/all', [ApiController::class, 'getAllEquipe']);
 Route::post('/api/equipe/create', [ApiController::class, 'createEquipe']);
 Route::post('/api/equipe/auth', [ApiController::class, 'authAuthEquipe']);
 Route::get('/api/equipe/{token}', [ApiController::class, 'getByTokenEquipe']);
+Route::middleware('auth:api')->group(function () {
+    Route::post('/membre', 'EquipeController@addMembre');
+    Route::delete('/membre/{id}', 'EquipeController@deleteMembre'); 
+});

@@ -1,30 +1,42 @@
 <?php
-
 namespace App\Http\Controllers;
 
+use App\Models\Equipe;
 use App\Models\Hackathon;
+use App\Utils\SessionHelpers;
 use Illuminate\Http\Request;
 
 class MainController extends Controller
 {
-    /**
-     * Retourne la page d'accueil
-     */
     public function home()
     {
-        // Récuération du hackathon actif (celui en cours)
         $hackathon = Hackathon::getActiveHackathon();
+        $showButtons = true;
+        $message = '';
 
-        // Affichage de la vue, avec les données récupérées
+        if ($hackathon) {
+            $nbEquipes = Equipe::getEquipesInHackhon($hackathon->idhackathon)->count();
+            if ($nbEquipes >= $hackathon->nbequipemax) {
+                $showButtons = false;
+                $message = "Le nombre maximum d'équipes est atteint.";
+            }
+
+            // Récupérer les équipes participantes
+            $participants = Equipe::getEquipesInHackhon($hackathon->idhackathon);
+        } else {
+            $participants = collect();
+        }
+
+        // Passer les données à la vue
         return view('main.home', [
             'hackathon' => $hackathon,
-            'organisateur' => $hackathon->organisateur,
+            'showButtons' => $showButtons,
+            'message' => $message,
+            'organisateur' => $hackathon ? $hackathon->organisateur : null,
+            'participants' => $participants,
         ]);
     }
 
-    /**
-     * Retourne la page "À propos"
-     */
     public function about()
     {
         return view('main.about');

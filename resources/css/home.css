@@ -1,0 +1,33 @@
+body {
+    background-color: rgba(0, 0, 0, 0.5); /* Ajoute un fond semi-transparent pour améliorer la lisibilité du texte */
+    color: white;
+}
+
+.card {
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    color: white;
+}
+
+.card-header {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 15px 15px 0 0;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.btn-primary, .btn-success {
+    border-radius: 50px;
+}
+
+.modal-content {
+    border-radius: 15px;
+}
+
+.text-white {
+    color: white !important;
+}

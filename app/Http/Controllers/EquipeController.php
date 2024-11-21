@@ -8,6 +8,9 @@ use App\Models\Inscrire;
 use App\Models\Membre;
 use App\Utils\EmailHelpers;
 use App\Utils\SessionHelpers;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 
 class EquipeController extends Controller
@@ -178,12 +181,7 @@ class EquipeController extends Controller
         // Récupération du hackathon ou l'équipe est inscrite
         $hackathon = $equipe->hackathons()->first();
 
-        // Membre de l'équipe,
-        // Membre::where('idequipe', $equipe->idequipe)->get(); // Ancienne méthode
-        // Voir la méthode membres() dans le modèle Equipe équivalente à la ligne précédente.
-        $membres = $equipe->membres()->get();
-
-        return view('equipe.me', ['connected' => $equipe, 'membres' => $membres, 'hackathon' => $hackathon, 'membres' => $membres]);
+        return view('equipe.me', ['connected' => $equipe, 'membres' => $membres, 'hackathon' => $hackathon]);
     }
 
     /**
@@ -191,63 +189,208 @@ class EquipeController extends Controller
      */
     public function addMembre(Request $request)
     {
-        // Ajout d'un membre à l'équipe
-        $equipe = SessionHelpers::getConnected();
+        if (!SessionHelpers::isConnected()) {
+            return response()->json(['success' => false, 'message' => 'Non autorisé'], 401);
+        }
 
-        // Validation des données, pour l'instant nous n'avons que NOM et PRENOM.
-        // TODO : À l'avenir ajouter l'ensemble des champs nécessaires prévus dans la base de données.
-
-        $request->validate(
-            [
-                'nom' => 'required|string|max:255',
-                'prenom' => 'required|string|max:255',
-            ],
-            [
-                'required' => 'Le champ :attribute est obligatoire.',
-                'string' => 'Le champ :attribute doit être une chaîne de caractères.',
-                'max' => 'Le champ :attribute ne peut pas dépasser :max caractères.',
-            ],
-            [
-                'nom' => 'nom',
-                'prenom' => 'prénom',
-            ]
-        );
+        $validated = $request->validate([
+            'nom' => 'required|string|max:128',
+            'prenom' => 'required|string|max:128',
+            'email' => 'required|email|max:255|unique:MEMBRE,email',
+            'telephone' => 'nullable|string|max:20',
+            'datenaissance' => 'nullable|date',
+            'lienportfolio' => 'nullable|url|max:255'
+        ]);
 
         try {
-            // Création du membre
+            $equipe = SessionHelpers::getConnected();
+
             $membre = new Membre();
-            $membre->nom = $request->input('nom');
-            $membre->prenom = $request->input('prenom');
+            $membre->nom = $validated['nom'];
+            $membre->prenom = $validated['prenom'];
+            $membre->email = $validated['email'];
+            $membre->telephone = $validated['telephone'];
+            $membre->datenaissance = $validated['datenaissance'];
+            $membre->lienportfolio = $validated['lienportfolio'];
             $membre->idequipe = $equipe->idequipe;
             $membre->save();
 
-            // TODO : envoyer un email de confirmation au membre en s'inspirant de la méthode create de EquipeController (emailHelpers::sendEmail)
+            // Envoi email
+            EmailHelpers::sendEmail(
+                $membre->email,
+                "Bienvenue dans l'équipe",
+                "email.membre-welcome",
+                ['membre' => $membre, 'equipe' => $equipe]
+            );
 
-            // Redirection vers la page de l'équipe
-            return redirect("/me")->with('success', "Le membre a bien été ajouté à votre équipe.");
+            return response()->json([
+                'success' => true,
+                'message' => 'Membre ajouté avec succès',
+                'membre' => $membre
+            ]);
+
         } catch (\Exception $e) {
-            // Redirection vers la page de l'équipe avec un message d'erreur
-            return redirect("/me")->withErrors(['errors' => "Une erreur est survenue lors de l'ajout du membre à votre équipe."]);
+            Log::error('Erreur ajout membre: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'ajout du membre'
+            ], 500);
         }
     }
-    public function showMembers($idequipe)
+
+    // Méthode de suppression d'un membre
+    public function deleteMembre($id)
     {
-        // On récupère l'équipe en fonction de l'id
-        $equipe = Equipe::where('idequipe', $idequipe)->first();
-
-        // Si l'équipe n'existe pas, on redirige avec un message d'erreur
-        if (!$equipe) {
-            return redirect()->back()->withErrors(['error' => 'Cette équipe n\'existe pas.']);
+        if (!SessionHelpers::isConnected()) {
+            return response()->json(['error' => 'Non autorisé'], 401);
         }
 
-        // On récupère les membres de l'équipe
-        $membres = Membre::where('idequipe', $idequipe)->get();
+        $membre = Membre::find($id);
+        if (!$membre) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le membre n\'existe pas',
+            ], 404);
+        }
 
-        // On affiche la vue avec les membres
-        return view('doc.membres', [
-            'lequipe' => $equipe,
-            'data' => $membres
-        ]);
+        try {
+            $membre->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Membre supprimé avec succès',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur suppression membre: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la suppression',
+            ], 500);
+        }
     }
 
+    public function showMembers()
+{
+    if (!SessionHelpers::isConnected()) {
+        return redirect('/login');
+    }
+
+    $equipe = SessionHelpers::getConnected();
+    $membres = Membre::where('idequipe', $equipe->idequipe)->get();
+
+    return view('me', compact('membres')); // Vérifiez le nom de la vue ici
+}
+// Affiche le formulaire d'édition du profil
+public function editProfileForm()
+{
+    if (!SessionHelpers::isConnected()) {
+        return redirect('/login');
+    }
+
+    $equipe = SessionHelpers::getConnected();
+    return view('equipe.edit-profile', compact('equipe'));
+}
+
+// Met à jour le profil de l'équipe
+public function updateProfile(Request $request)
+{
+    if (!SessionHelpers::isConnected()) {
+        return redirect('/login');
+    }
+
+    $validated = $request->validate([
+        'nom' => 'required|string|max:255',
+        'lien' => 'nullable|string|max:255',
+        'email' => 'required|email|max:255|unique:EQUIPE,login,' . SessionHelpers::getConnected()->idequipe . ',idequipe',
+        'password' => 'nullable|string|min:8|confirmed',
+    ], [
+        'required' => 'Le champ :attribute est obligatoire.',
+        'string' => 'Le champ :attribute doit être une chaîne de caractères.',
+        'max' => 'Le champ :attribute ne peut pas dépasser :max caractères.',
+        'email' => 'Le champ :attribute doit être une adresse email valide.',
+        'unique' => 'Cette adresse :attribute est déjà utilisée.',
+        'min' => 'Le champ :attribute doit contenir au moins :min caractères.',
+        'confirmed' => 'Les mots de passe ne correspondent pas.',
+    ]);
+
+    try {
+        $equipe = SessionHelpers::getConnected();
+        $equipe->nomequipe = $validated['nom'];
+        $equipe->lienprototype = $validated['lien'];
+        $equipe->login = $validated['email'];
+
+        if (!empty($validated['password'])) {
+            $equipe->password = Hash::make($validated['password']);
+        }
+
+        $equipe->save();
+
+        return redirect()->route('me')->with('success', 'Profil mis à jour avec succès');
+    } catch (\Exception $e) {
+        Log::error('Erreur mise à jour profil: ' . $e->getMessage());
+        return redirect()->route('edit-profile')->withErrors(['errors' => 'Erreur lors de la mise à jour du profil']);
+    }
+}
+
+/**
+     * Méthode pour quitter un hackathon.
+     */
+    public function quitHackathon(Request $request)
+    {
+        if (!SessionHelpers::isConnected()) {
+            return redirect('/login')->withErrors(['errors' => 'Vous devez être connecté pour quitter un hackathon.']);
+        }
+
+        $equipe = SessionHelpers::getConnected();
+        $hackathon = Hackathon::find($request->input('idhackathon'));
+
+        if (!$hackathon) {
+            return redirect()->back()->withErrors(['errors' => 'Ce hackathon n\'existe pas.']);
+        }
+
+        $inscription = Inscrire::where('idequipe', $equipe->idequipe)
+            ->where('idhackathon', $hackathon->idhackathon)
+            ->first();
+
+        if (!$inscription) {
+            return redirect()->back()->withErrors(['errors' => 'Vous n\'êtes pas inscrit à ce hackathon.']);
+        }
+
+        $inscription->datedesincription = now();
+        $inscription->save();
+
+        return redirect()->route('home')->with('success', 'Vous avez quitté le hackathon avec succès.');
+    }
+    public function downloadTeamData(Request $request)
+    {
+        if (!SessionHelpers::isConnected()) {
+            return redirect('/login')->withErrors(['errors' => 'Vous devez être connecté pour télécharger les données.']);
+        }
+
+        $equipe = SessionHelpers::getConnected();
+
+        // Récupérer les données de l'équipe
+        $data = [
+            'equipe' => $equipe,
+            'membres' => $equipe->membres,
+            'hackathons' => $equipe->hackathons,
+            'inscriptions' => Inscrire::where('idequipe', $equipe->idequipe)->get(),
+        ];
+
+        // Générer le fichier JSON
+        $json = json_encode($data, JSON_PRETTY_PRINT);
+        $fileName = 'team_data_' . $equipe->idequipe . '.json';
+        Storage::disk('local')->put($fileName, $json);
+
+        // Envoyer l'email avec le fichier JSON en pièce jointe
+        EmailHelpers::sendEmail(
+            $equipe->login,
+            'Téléchargement des données de l\'équipe',
+            'email.team-data',
+            ['equipe' => $equipe],
+            storage_path('app/' . $fileName)
+        );
+
+        return redirect()->back()->with('success', 'Votre demande de téléchargement des données a été initiée. Vous recevrez un email avec les données sous peu.');
+    }
 }

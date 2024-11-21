@@ -1,9 +1,9 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Hackathon extends Model
 {
@@ -15,11 +15,8 @@ class Hackathon extends Model
 
     protected $fillable = ['dateheuredebuth', 'dateheurefinh', 'lieu', 'ville', 'conditions', 'thematique', 'affiche', 'objectifs', 'idorganisateur'];
 
-    /*
-     * Retourne le premier hackathon actif
-     * Un hackathon est actif si sa date de fin est postérieure à la date actuelle
-     * @return HackathonController
-     */
+    protected $dates = ['dateheuredebuth', 'dateheurefinh'];
+
     public static function getActiveHackathon(): Hackathon
     {
         return Hackathon::where('dateheurefinh', '>', now())->orderBy('dateheuredebuth')->first();
@@ -33,5 +30,10 @@ class Hackathon extends Model
     public function equipes()
     {
         return $this->belongsToMany(Equipe::class, 'INSCRIRE', 'idhackathon', 'idequipe')->withPivot('dateinscription');
+    }
+
+    public function commentaires()
+    {
+        return $this->hasMany(Commentaire::class, 'idhackathon', 'idhackathon');
     }
 }

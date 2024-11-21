@@ -6,6 +6,7 @@ use App\Models\Equipe;
 use App\Models\Hackathon;
 use App\Models\Membre;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ApiController extends Controller
 {
@@ -30,10 +31,16 @@ class ApiController extends Controller
      * @param $idh
      * @return \Illuminate\Http\JsonResponse
      */
-    function getEquipeByHackathon($idh)
-    {
-        return response()->json(Equipe::getEquipesInHackhon($idh));
+    public function getEquipeByHackathon($idh)
+{
+    try {
+        $equipes = Equipe::getEquipesInHackhon($idh);
+        return response()->json($equipes);
+    } catch (\Exception $e) {
+        Log::error('Erreur lors de la récupération des équipes: ' . $e->getMessage());
+        return response()->json(['error' => 'Une erreur est survenue'], 500);
     }
+}
 
     /**
      * Retourne tous les membres présents dans la base de données.
@@ -49,9 +56,18 @@ class ApiController extends Controller
      * @param $idequipe
      * @return \Illuminate\Http\JsonResponse
      */
-    function getByEquipeId($idequipe)
+    public function getByEquipeId($idequipe)
     {
-        return response()->json(Membre::where('idequipe', $idequipe)->get());
+        try {
+            $membres = Membre::where('idequipe', $idequipe)
+                           ->where('archiver', 0)
+                           ->get(['idmembre', 'nom', 'prenom']);
+            
+            return response()->json($membres);
+        } catch (\Exception $e) {
+            Log::error('Erreur récupération membres: ' . $e->getMessage());
+            return response()->json(['error' => 'Erreur serveur'], 500);
+        }
     }
 
     /**
