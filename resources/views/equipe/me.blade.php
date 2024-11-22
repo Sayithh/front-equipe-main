@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('title', ' - Mon équipe')
@@ -43,11 +44,15 @@
             <!-- Bouton pour éditer le profil -->
             <a href="{{ route('edit-profile') }}" class="btn btn-secondary mt-3">Éditer le profil</a>
 
-            <!-- Bouton pour télécharger les données -->
-            <form action="{{ route('download-team-data') }}" method="POST" class="mt-3">
-                @csrf
-                <button type="submit" class="btn btn-primary">Télécharger les données de l'équipe</button>
-            </form>
+            <div class="card cardRadius mt-3">
+                <div class="card-body">
+                    <h3>Télécharger les données</h3>
+                    <p>Pour respecter vos droits RGPD, vous pouvez télécharger toutes les données liées à votre équipe.</p>
+                    <a href="{{ route('equipe.download-data') }}" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Télécharger les données
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -100,14 +105,23 @@
                     <div class="mb-3">
                         <label class="form-label">Nom</label>
                         <input type="text" name="nom" class="form-control" required>
+                        <div class="invalid-feedback">
+                            Veuillez entrer un nom.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Prénom</label>
                         <input type="text" name="prenom" class="form-control" required>
+                        <div class="invalid-feedback">
+                            Veuillez entrer un prénom.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Email</label>
                         <input type="email" name="email" class="form-control" required>
+                        <div class="invalid-feedback">
+                            Veuillez entrer un email valide.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Téléphone</label>
@@ -130,7 +144,6 @@
         </form>
     </div>
 </div>
-
 @endsection
 
 @section('scripts')
@@ -172,5 +185,53 @@ function deleteMembre(id, name) {
         });
     }
 }
+
+document.getElementById('addMemberForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+
+    fetch('/api/membre', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const memberList = document.querySelector('.members-list');
+            const newMember = document.createElement('div');
+            newMember.classList.add('member-card', 'p-3', 'mb-2', 'border', 'rounded');
+            newMember.setAttribute('data-id', data.membre.idmembre);
+            newMember.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${data.membre.prenom} ${data.membre.nom}</h6>
+                        <p class="mb-1 text-muted">
+                            <i class="fas fa-envelope me-2"></i>${data.membre.email}
+                            ${data.membre.telephone ? `<br><i class="fas fa-phone me-2"></i>${data.membre.telephone}` : ''}
+                        </p>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="deleteMembre(${data.membre.idmembre}, '${data.membre.nom} ${data.membre.prenom}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            memberList.appendChild(newMember);
+            form.reset();
+            form.classList.remove('was-validated');
+            $('#addMemberModal').modal('hide');
+        } else {
+            alert(data.message || 'Erreur lors de l\'ajout du membre');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert('Une erreur est survenue');
+    });
+});
 </script>
 @endsection

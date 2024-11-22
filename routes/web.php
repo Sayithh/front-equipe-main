@@ -9,12 +9,15 @@ use App\Http\Controllers\AdminController;
 use App\Http\Middleware\IsEquipeConnected;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\MembreController;
+
 
 
 // Inclusion des routes API supplémentaires
 include('inc/api.php');
 
-Route::get('/me', [EquipeController::class, 'showMembers'])->name('me');
+
+Route::post('/logout', [EquipeController::class, 'logout'])->name('logout');
 
 // Routes principales accessibles sans authentification
 Route::get('/', [MainController::class, 'home'])->name('home');
@@ -34,18 +37,17 @@ Route::prefix('doc-api')->group(function () {
     Route::get('/equipes', [ApiDocController::class, 'listeEquipes'])->name('doc-api-equipes');
 });
 
-// Routes API accessibles uniquement avec authentification Laravel (middleware 'auth')
 Route::middleware(['auth'])->group(function () {
-    Route::post('/api/membre', [EquipeController::class, 'addMembre'])->name('api.membre.add');
-    Route::delete('/api/membre/{id}', [EquipeController::class, 'deleteMembre'])->name('api.membre.delete');
+    Route::get('/equipe/membres', [EquipeController::class, 'showMembers'])->name('equipe.membres');
+    Route::post('/equipe/membres', [EquipeController::class, 'addMembre'])->name('equipe.addMembre');
+    Route::delete('/equipe/membres/{id}', [EquipeController::class, 'deleteMembre'])->name('equipe.deleteMembre');
 });
+
 
 // Routes nécessitant une session active (middleware IsEquipeConnected)
 
 Route::middleware(IsEquipeConnected::class)->group(function () {
     Route::get('/me', [EquipeController::class, 'me'])->name('me');
-    Route::post('/api/membre', [EquipeController::class, 'addMembre'])->name('api.membre.add');
-    Route::delete('/api/membre/{id}', [EquipeController::class, 'deleteMembre'])->name('api.membre.delete');
     Route::get('/edit-profile', [EquipeController::class, 'editProfileForm'])->name('edit-profile');
     Route::post('/edit-profile', [EquipeController::class, 'updateProfile'])->name('update-profile');
 });
@@ -73,7 +75,11 @@ Route::post('/quit-hackathon', [EquipeController::class, 'quitHackathon'])->name
 Route::get('/hackathons', [HackathonController::class, 'index'])->name('hackathon.index');
 Route::get('/hackathon/{id}', [HackathonController::class, 'show'])->name('hackathon.show');
 Route::post('/hackathon/{id}/comment', [HackathonController::class, 'addComment'])->name('hackathon.addComment');
-Route::post('/download-team-data', [EquipeController::class, 'downloadTeamData'])->name('download-team-data');
+Route::get('/equipe/download-data', [EquipeController::class, 'downloadTeamData'])->name('equipe.download-data');
+
 
 Route::get('/stats/hackathon/{id}', [StatsController::class, 'hackathonStats'])->name('stats.hackathon');
 Route::get('/stats/public', [StatsController::class, 'publicStats'])->name('stats.public');
+Route::get('/api/membre/{idEquipe}', [EquipeController::class, 'viewMembers']);
+Route::post('/api/add-membre', [EquipeController::class, 'addMembre']);
+Route::post('/api/delete-membre', [EquipeController::class, 'deleteMembre']);

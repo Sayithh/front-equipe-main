@@ -12,7 +12,7 @@ class StatsController extends Controller
     {
         $hackathon = Hackathon::findOrFail($id);
         $equipes = $hackathon->equipes()->count();
-        $participants = Membre::whereIn('idequipe', $hackathon->equipes()->pluck('idequipe'))->count();
+        $participants = Membre::whereIn('idequipe', $hackathon->equipes()->pluck('EQUIPE.idequipe'))->count();
 
         return view('stats.hackathon', [
             'hackathon' => $hackathon,

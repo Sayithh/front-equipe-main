@@ -8,21 +8,19 @@ use Illuminate\Support\Facades\View;
 
 class EmailHelpers
 {
-    public static function sendEmail($to, $subject, $template, $data = [])
-    {
-        try {
-            $body = View::make($template, $data)->render();
+    public static function sendEmail($to, $subject, $view, $data = [], $attachmentPath = null)
+{
+    try {
+        Mail::send($view, $data, function ($message) use ($to, $subject, $attachmentPath) {
+            $message->to($to)
+                    ->subject($subject);
 
-            Mail::send([], [], function ($message) use ($to, $subject, $body) {
-                $message->to($to)
-                    ->subject($subject)
-                    ->html($body);
-            });
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Email sending failed: ' . $e->getMessage());
-            return false;
-        }
+            // Ajout de la pièce jointe si elle existe
+            if ($attachmentPath) {
+                $message->attach($attachmentPath);
+            }
+        });
+    } catch (\Exception $e) {
+        Log::error('Erreur lors de l\'envoi de l\'email : ' . $e->getMessage());
     }
-}
+}}
